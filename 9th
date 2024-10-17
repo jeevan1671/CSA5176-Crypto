@@ -1,0 +1,110 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+void preprocessText(char *text) {
+    int i, j = 0;
+    for (i = 0; text[i]; i++) {
+        if (isalpha(text[i])) {
+            text[j] = toupper(text[i]);
+            if (text[j] == 'J') text[j] = 'I';
+            j++;
+        }
+    }
+    text[j] = '\0';
+}
+void createPlayfairMatrix(char *keyword, char playfairMatrix[5][5]) {
+    char alphabet[26] = {0};
+    int i, j, k = 0;
+    preprocessText(keyword);
+    for (i = 0; i < 26; i++) {
+        alphabet[i] = 0;
+    }
+    alphabet['J' - 'A'] = 1;
+    for (i = 0; i < strlen(keyword); i++) {
+        if (!alphabet[keyword[i] - 'A']) {
+            playfairMatrix[k/5][k%5] = keyword[i];
+            alphabet[keyword[i] - 'A'] = 1;
+            k++;
+        }
+    }
+    for (i = 0; i < 26; i++) {
+        if (!alphabet[i]) {
+            playfairMatrix[k/5][k%5] = i + 'A';
+            k++;
+        }
+    }
+}
+void findPosition(char playfairMatrix[5][5], char ch, int *row, int *col) {
+    int i, j;
+    for (i = 0; i < 5; i++) {
+        for (j = 0; j < 5; j++) {
+            if (playfairMatrix[i][j] == ch) {
+                *row = i;
+                *col = j;
+                return;
+            }
+        }
+    }
+}
+void preparePlaintext(char *plaintext) {
+    int i, j = 0;
+    char prepared[1000];
+    preprocessText(plaintext);
+    for (i = 0; i < strlen(plaintext); i++) {
+        prepared[j++] = plaintext[i];
+        if (i + 1 < strlen(plaintext)) {
+            if (plaintext[i] == plaintext[i + 1]) {
+                prepared[j++] = 'X';
+            }
+        }
+    }
+    if (j % 2 != 0) {
+        prepared[j++] = 'X';
+    }
+    prepared[j] = '\0';
+    strcpy(plaintext, prepared);
+}
+void encrypt(char *plaintext, char *ciphertext, char playfairMatrix[5][5]) {
+    int i, row1, col1, row2, col2;
+    preparePlaintext(plaintext);   
+    for (i = 0; i < strlen(plaintext); i += 2) {
+        findPosition(playfairMatrix, plaintext[i], &row1, &col1);
+        findPosition(playfairMatrix, plaintext[i+1], &row2, &col2);
+
+        if (row1 == row2) {
+            ciphertext[i] = playfairMatrix[row1][(col1 + 1) % 5];
+            ciphertext[i + 1] = playfairMatrix[row2][(col2 + 1) % 5];
+        }
+        else if (col1 == col2) {
+            ciphertext[i] = playfairMatrix[(row1 + 1) % 5][col1];
+            ciphertext[i + 1] = playfairMatrix[(row2 + 1) % 5][col2];
+        }
+        else {
+            ciphertext[i] = playfairMatrix[row1][col2];
+            ciphertext[i + 1] = playfairMatrix[row2][col1];
+        }
+    }
+    ciphertext[strlen(plaintext)] = '\0';
+}
+void printMatrix(char playfairMatrix[5][5]) {
+    int i, j;
+    printf("\nPlayfair Matrix:\n");
+    for (i = 0; i < 5; i++) {
+        for (j = 0; j < 5; j++) {
+            printf("%c ", playfairMatrix[i][j]);
+        }
+        printf("\n");
+    }
+}
+int main() {
+    char keyword[] = "KEYWORD";
+    char plaintext[] = "HELLO WORLD";
+    char ciphertext[1000];
+    char playfairMatrix[5][5];
+    createPlayfairMatrix(keyword, playfairMatrix);
+    printMatrix(playfairMatrix);
+    printf("\nOriginal text: %s\n", plaintext);
+    encrypt(plaintext, ciphertext, playfairMatrix);
+    printf("Encrypted text: %s\n", ciphertext);   
+    return 0;
+}
