@@ -1,0 +1,51 @@
+#include <stdio.h>
+#include <string.h>
+void encrypt(char *plaintext, char *ciphertext, char playfairMatrix[5][5]) {
+    int i, j, k, row1, col1, row2, col2;
+    int len = strlen(plaintext);
+    for (i = 0; i < len; i += 2) {
+        row1 = col1 = row2 = col2 = -1;
+        for (j = 0; j < 5; j++) {
+            for (k = 0; k < 5; k++) {
+                if (playfairMatrix[j][k] == plaintext[i]) {
+                    row1 = j;
+                    col1 = k;
+                }
+                if (playfairMatrix[j][k] == plaintext[i + 1]) {
+                    row2 = j;
+                    col2 = k;
+                }
+            }
+        }
+        if (row1 == -1 || row2 == -1) {
+            printf("Error: Character not found in matrix\n");
+            return;
+        }
+        if (row1 == row2) {
+            ciphertext[i] = playfairMatrix[row1][(col1 + 1) % 5];
+            ciphertext[i + 1] = playfairMatrix[row2][(col2 + 1) % 5];
+        } else if (col1 == col2) {
+            ciphertext[i] = playfairMatrix[(row1 + 1) % 5][col1];
+            ciphertext[i + 1] = playfairMatrix[(row2 + 1) % 5][col2];
+        } else {
+            ciphertext[i] = playfairMatrix[row1][col2];
+            ciphertext[i + 1] = playfairMatrix[row2][col1];
+        }
+    }
+    ciphertext[len] = '\0'; 
+}
+int main() {
+    char plaintext[] = "MUSTSEEYOUOVERCADOGANWESTCOMINGATONCE";
+    char ciphertext[100];
+    char playfairMatrix[5][5] = {
+        {'M', 'F', 'H', 'I', 'K'},
+        {'U', 'N', 'O', 'P', 'Q'},
+        {'Z', 'V', 'W', 'X', 'Y'},
+        {'E', 'L', 'A', 'R', 'G'},
+        {'D', 'S', 'T', 'B', 'C'}
+    };
+    encrypt(plaintext, ciphertext, playfairMatrix);
+    printf("Plaintext: %s\n", plaintext);
+    printf("Ciphertext: %s\n", ciphertext);   
+    return 0;
+}
