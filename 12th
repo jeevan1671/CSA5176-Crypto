@@ -1,0 +1,47 @@
+#include <stdio.h>
+#include <string.h>
+#define KEY_SIZE 2
+void matrixMultiply(int A[KEY_SIZE][KEY_SIZE], int B[KEY_SIZE][1], int C[KEY_SIZE][1]) {
+    int i, j, k;
+    for (i = 0; i < KEY_SIZE; i++) {
+        C[i][0] = 0;
+        for (j = 0; j < KEY_SIZE; j++) {
+            for (k = 0; k < 1; k++) {
+                C[i][0] += A[i][j] * B[j][0];
+            }
+        }
+        C[i][0] %= 26;
+    }
+}
+int main() {
+    char plaintext[] = "meet me at the usual place at ten rather than eight";
+    char ciphertext[strlen(plaintext)];
+    int key[KEY_SIZE][KEY_SIZE] = {{9, 4}, {4, 9}};
+    int plaintextMatrix[KEY_SIZE][1], ciphertextMatrix[KEY_SIZE][1];
+    int i, j, k;
+    for (i = 0; i < strlen(plaintext); i++) {
+        plaintextMatrix[i % KEY_SIZE][0] = plaintext[i] - 'A';
+    }
+    for (i = 0; i < strlen(plaintext); i += KEY_SIZE) {
+        matrixMultiply(key, &plaintextMatrix[i], &ciphertextMatrix[i]);
+    }
+    for (i = 0; i < strlen(plaintext); i++) {
+        ciphertext[i] = ciphertextMatrix[i % KEY_SIZE][0] + 'A';
+    }
+    printf("Ciphertext: %s\n", ciphertext);
+    int inverseKey[KEY_SIZE][KEY_SIZE];
+    int determinant = key[0][0] * key[1][1] - key[0][1] * key[1][0];
+    determinant = (determinant + 26) % 26;
+    inverseKey[0][0] = key[1][1] * determinant % 26;
+    inverseKey[0][1] = -key[0][1] * determinant % 26;
+    inverseKey[1][0] = -key[1][0] * determinant % 26;
+    inverseKey[1][1] = key[0][0] * determinant % 26;
+    for (i = 0; i < strlen(plaintext); i += KEY_SIZE) {
+        matrixMultiply(inverseKey, &ciphertextMatrix[i], &plaintextMatrix[i]);
+    }
+    for (i = 0; i < strlen(plaintext); i++) {
+        plaintext[i] = plaintextMatrix[i % KEY_SIZE][0] + 'A';
+    }
+    printf("Decrypted Plaintext: %s\n", plaintext);
+    return 0;
+}
