@@ -1,0 +1,54 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#define ALPHABET_SIZE 26
+int mod_inverse(int a, int m) {
+    for (int x = 1; x < m; x++)
+        if (((a % m) * (x % m)) % m == 1)
+            return x;
+    return -1;
+}
+void decrypt_affine(char *ciphertext, int a, int b) {
+    int a_inv = mod_inverse(a, ALPHABET_SIZE);   
+    for (int i = 0; ciphertext[i] != '\0'; i++) {
+        if (isalpha(ciphertext[i])) {
+            char base = isupper(ciphertext[i]) ? 'A' : 'a';
+            int x = ciphertext[i] - base;
+            int decrypted = (a_inv * (x - b + ALPHABET_SIZE)) % ALPHABET_SIZE;
+            ciphertext[i] = (decrypted + base);
+        }
+    }
+}
+int main() {
+    char ciphertext[1000];
+    int freq[ALPHABET_SIZE] = {0};
+    int max_freq = 0, second_max_freq = 0;
+    char most_frequent, second_most_frequent;
+    printf("Enter the ciphertext: ");
+    fgets(ciphertext, sizeof(ciphertext), stdin);
+    ciphertext[strcspn(ciphertext, "\n")] = 0;
+    for (int i = 0; ciphertext[i] != '\0'; i++) {
+        if (isalpha(ciphertext[i])) {
+            freq[toupper(ciphertext[i]) - 'A']++;
+        }
+    }
+    for (int i = 0; i < ALPHABET_SIZE; i++) {
+        if (freq[i] > max_freq) {
+            second_max_freq = max_freq;
+            second_most_frequent = most_frequent;
+            max_freq = freq[i];
+            most_frequent = i + 'A';
+        } else if (freq[i] > second_max_freq) {
+            second_max_freq = freq[i];
+            second_most_frequent = i + 'A';
+        }
+    }
+    printf("Most frequent letter: %c\n", most_frequent);
+    printf("Second most frequent letter: %c\n", second_most_frequent);
+    int a = ((most_frequent - 'B' + ALPHABET_SIZE) - (second_most_frequent - 'U' + ALPHABET_SIZE)) % ALPHABET_SIZE;
+    a = mod_inverse(a, ALPHABET_SIZE);
+    int b = (most_frequent - 'B' + ALPHABET_SIZE) % ALPHABET_SIZE;
+    decrypt_affine(ciphertext, a, b);
+    printf("Decrypted text: %s\n", ciphertext);
+    return 0;
+}
