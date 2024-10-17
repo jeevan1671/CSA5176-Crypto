@@ -1,0 +1,13 @@
+#include <stdio.h>
+#include <math.h>
+int main() {
+    long long numKeys = 26LL * 25 * 24 * 23 * 22;    
+    double logResult = log2((double)numKeys);    
+    int powerOfTwo = (int)logResult;    
+    printf("Approximate number of possible keys (ignoring duplicates): 2^%d\n", powerOfTwo);
+    numKeys /= 10;    
+    logResult = log2((double)numKeys);
+    powerOfTwo = (int)logResult;
+    printf("Approximate number of effectively unique keys: 2^%d\n", powerOfTwo);
+    return 0;
+}
