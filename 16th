@@ -1,0 +1,125 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#define ALPHABET_SIZE 26
+#define MAX_TEXT_SIZE 10000
+#define TOP_N 10
+const char english_freq_order[] = "ETAOINSHRDLUCMFWYPVBGKQJXZ";
+const char* common_digrams[] = {
+    "TH", "HE", "IN", "ER", "AN", "RE", "ND", "AT", "ON", "NT",
+    "HA", "ES", "ST", "EN", "ED", "TO", "IT", "OU", "EA", "HI"
+};
+typedef struct {
+    char letter;
+    int count;
+    double frequency;
+} LetterFreq;
+typedef struct {
+    char mapping[ALPHABET_SIZE];
+    double score;
+} Solution;
+int compare_freq(const void* a, const void* b) {
+    return ((LetterFreq*)b)->count - ((LetterFreq*)a)->count;
+}
+int compare_solutions(const void* a, const void* b) {
+    return ((Solution*)a)->score > ((Solution*)b)->score ? -1 : 1;
+}
+void calculate_frequencies(const char* text, LetterFreq* freqs) {
+    int total = 0;
+    for (int i = 0; i < ALPHABET_SIZE; i++) {
+        freqs[i].letter = 'A' + i;
+        freqs[i].count = 0;
+        freqs[i].frequency = 0.0;
+    }
+    for (int i = 0; text[i]; i++) {
+        if (isalpha(text[i])) {
+            int idx = toupper(text[i]) - 'A';
+            freqs[idx].count++;
+            total++;
+        }
+    }
+    for (int i = 0; i < ALPHABET_SIZE; i++) {
+        freqs[i].frequency = (double)freqs[i].count / total;
+    }
+    qsort(freqs, ALPHABET_SIZE, sizeof(LetterFreq), compare_freq);
+}
+int count_digrams(const char* text, const char* mapping, const char* digram) {
+    int count = 0;
+    char mapped_digram[3] = {0};
+    mapped_digram[0] = mapping[digram[0] - 'A'];
+    mapped_digram[1] = mapping[digram[1] - 'A'];
+    for (int i = 0; text[i + 1]; i++) {
+        if (isalpha(text[i]) && isalpha(text[i + 1])) {
+            char curr[3] = {toupper(text[i]), toupper(text[i + 1]), 0};
+            if (strcmp(curr, mapped_digram) == 0) {
+                count++;
+            }
+        }
+    }
+    return count;
+}
+double calculate_score(const char* text, const char* mapping) {
+    double score = 0.0;
+    for (int i = 0; i < sizeof(common_digrams) / sizeof(common_digrams[0]); i++) {
+        score += count_digrams(text, mapping, common_digrams[i]) * (20 - i);
+    }   
+    return score;
+}
+void apply_mapping(const char* ciphertext, const char* mapping, char* plaintext) {
+    for (int i = 0; ciphertext[i]; i++) {
+        if (isalpha(ciphertext[i])) {
+            char base = isupper(ciphertext[i]) ? 'A' : 'a';
+            int idx = toupper(ciphertext[i]) - 'A';
+            plaintext[i] = mapping[idx] + (isupper(ciphertext[i]) ? 0 : 32);
+        } else {
+            plaintext[i] = ciphertext[i];
+        }
+    }
+}
+void frequency_attack(const char* ciphertext) {
+    LetterFreq cipher_freqs[ALPHABET_SIZE];
+    Solution solutions[ALPHABET_SIZE * ALPHABET_SIZE];
+    int solution_count = 0;
+    char plaintext[MAX_TEXT_SIZE];
+    calculate_frequencies(ciphertext, cipher_freqs);
+    char initial_mapping[ALPHABET_SIZE + 1];
+    for (int i = 0; i < ALPHABET_SIZE; i++) {
+        initial_mapping[cipher_freqs[i].letter - 'A'] = english_freq_order[i];
+    }
+    initial_mapping[ALPHABET_SIZE] = '\0';
+    for (int i = 0; i < ALPHABET_SIZE - 1; i++) {
+        for (int j = i + 1; j < ALPHABET_SIZE; j++) {
+            // Create new mapping by swapping two letters
+            strcpy(solutions[solution_count].mapping, initial_mapping);
+            char temp = solutions[solution_count].mapping[i];
+            solutions[solution_count].mapping[i] = solutions[solution_count].mapping[j];
+            solutions[solution_count].mapping[j] = temp;
+            solutions[solution_count].score = calculate_score(ciphertext, solutions[solution_count].mapping);
+            solution_count++;
+        }
+    }
+    qsort(solutions, solution_count, sizeof(Solution), compare_solutions);
+    printf("\nTop %d possible plaintexts:\n", TOP_N);
+    for (int i = 0; i < TOP_N && i < solution_count; i++) {
+        apply_mapping(ciphertext, solutions[i].mapping, plaintext);
+        printf("\nSolution %d (Score: %.2f):\n%s\n", 
+               i + 1, solutions[i].score, plaintext);
+        printf("Mapping: ");
+        for (int j = 0; j < ALPHABET_SIZE; j++) {
+            printf("%c->%c ", 'A' + j, solutions[i].mapping[j]);
+        }
+        printf("\n");
+    }
+}
+int main() {
+    char ciphertext[MAX_TEXT_SIZE];
+    printf("Enter ciphertext (max %d characters):\n", MAX_TEXT_SIZE - 1);
+    fgets(ciphertext, MAX_TEXT_SIZE, stdin);
+    size_t len = strlen(ciphertext);
+    if (len > 0 && ciphertext[len-1] == '\n') {
+        ciphertext[len-1] = '\0';
+    }
+    frequency_attack(ciphertext);   
+    return 0;
+}
