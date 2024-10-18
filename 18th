@@ -1,0 +1,161 @@
+#include <stdio.h>
+#include <stdint.h>
+
+// PC-1 table split into left and right halves (28 bits each)
+const int PC1_LEFT[28] = {
+    57, 49, 41, 33, 25, 17, 9, 1,
+    58, 50, 42, 34, 26, 18, 10, 2,
+    59, 51, 43, 35, 27, 19, 11, 3,
+    60, 52, 44, 36
+};
+
+const int PC1_RIGHT[28] = {
+    63, 55, 47, 39, 31, 23, 15, 7,
+    62, 54, 46, 38, 30, 22, 14, 6,
+    61, 53, 45, 37, 29, 21, 13, 5,
+    28, 20, 12, 4
+};
+
+// Left shift schedule
+const int SHIFTS[16] = {
+    1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1
+};
+
+// Structure to store the key schedule
+typedef struct {
+    uint64_t subkeys[16];
+} KeySchedule;
+
+// Function to get a bit from a 64-bit number
+int get_bit(uint64_t value, int position) {
+    return (value >> (63 - position)) & 1;
+}
+
+// Function to set a bit in a 64-bit number
+uint64_t set_bit(uint64_t value, int position, int bit) {
+    uint64_t mask = 1ULL << (63 - position);
+    if (bit) {
+        return value | mask;
+    } else {
+        return value & ~mask;
+    }
+}
+
+// Function to perform circular left shift on 28 bits
+uint32_t circular_left_shift(uint32_t value, int shift) {
+    uint32_t mask = (1 << 28) - 1;
+    value &= mask;
+    return ((value << shift) | (value >> (28 - shift))) & mask;
+}
+
+// Function to extract 28-bit subset using permutation table
+uint32_t extract_subset(uint64_t key, const int* permutation) {
+    uint32_t result = 0;
+    for (int i = 0; i < 28; i++) {
+        result = (result << 1) | get_bit(key, permutation[i] - 1);
+    }
+    return result;
+}
+
+// Function to generate subkeys
+void generate_subkeys(uint64_t initial_key, KeySchedule* schedule) {
+    // Extract initial 28-bit halves using PC-1
+    uint32_t C = extract_subset(initial_key, PC1_LEFT);
+    uint32_t D = extract_subset(initial_key, PC1_RIGHT);
+
+    printf("Initial split:\n");
+    printf("C0: 0x%07X\n", C);
+    printf("D0: 0x%07X\n", D);
+
+    // Generate 16 subkeys
+    for (int round = 0; round < 16; round++) {
+        // Perform left shifts
+        C = circular_left_shift(C, SHIFTS[round]);
+        D = circular_left_shift(D, SHIFTS[round]);
+
+        // Create subkey with first 24 bits from C and second 24 bits from D
+        uint64_t subkey = 0;
+
+        // First 24 bits from C
+        for (int i = 0; i < 24; i++) {
+            int bit = (C >> (27 - i)) & 1;
+            subkey = set_bit(subkey, i, bit);
+        }
+
+        // Second 24 bits from D
+        for (int i = 0; i < 24; i++) {
+            int bit = (D >> (27 - i)) & 1;
+            subkey = set_bit(subkey, i + 24, bit);
+        }
+
+        schedule->subkeys[round] = subkey;
+
+        printf("\nRound %2d:\n", round + 1);
+        printf("C%d: 0x%07X\n", round + 1, C);
+        printf("D%d: 0x%07X\n", round + 1, D);
+        printf("K%d: 0x%012lX\n", round + 1, subkey);
+    }
+}
+
+// Function to print bits in binary format
+void print_binary(uint64_t value, int bits) {
+    for (int i = bits - 1; i >= 0; i--) {
+        printf("%d", (int)((value >> i) & 1));
+        if (i % 8 == 0) printf(" ");
+    }
+    printf("\n");
+}
+
+// Function to analyze subkey generation
+void analyze_subkeys(KeySchedule* schedule) {
+    printf("\nSubkey Analysis:\n");
+    printf("---------------\n");
+
+    for (int i = 0; i < 16; i++) {
+        printf("\nSubkey %2d:\n", i + 1);
+        printf("First 24 bits:  ");
+        print_binary(schedule->subkeys[i] >> 24, 24);
+        printf("Second 24 bits: ");
+        print_binary(schedule->subkeys[i] & 0xFFFFFF, 24);
+    }
+}
+
+int main() {
+    // Test key
+    uint64_t initial_key = 0x133457799BBCDFF1;
+    KeySchedule schedule;
+
+    printf("Initial Key: 0x%016lX\n", initial_key);
+    printf("Binary representation:\n");
+    print_binary(initial_key, 64);
+    printf("\n");
+
+    // Generate and analyze subkeys
+    generate_subkeys(initial_key, &schedule);
+    analyze_subkeys(&schedule);
+
+    // Verify disjoint property
+    printf("\nVerifying disjoint property of subsets:\n");
+    printf("---------------------------------------\n");
+    uint64_t first_subset_mask = 0;
+    uint64_t second_subset_mask = 0;
+
+    // Mark bits used in first 24 bits
+    for (int i = 0; i < 28; i++) {
+        first_subset_mask |= 1ULL << (63 - (PC1_LEFT[i] - 1));
+    }
+
+    // Mark bits used in second 24 bits
+    for (int i = 0; i < 28; i++) {
+        second_subset_mask |= 1ULL << (63 - (PC1_RIGHT[i] - 1));
+    }
+
+    // Check for overlap
+    if ((first_subset_mask & second_subset_mask) == 0) {
+        printf("Verified: The subsets are disjoint!\n");
+    } else {
+        printf("Error: The subsets are not disjoint!\n");
+    }
+
+    return 0;
+}
