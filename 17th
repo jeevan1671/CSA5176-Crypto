@@ -1,0 +1,104 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+
+// Simplified 4-bit S-box
+const uint8_t SBOX[16] = {
+    14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7
+};
+
+// Structure to hold subkeys
+typedef struct {
+    uint32_t subkeys[16];
+} KeySchedule;
+
+// Function to perform a simple permutation
+uint32_t permute(uint32_t input, int size) {
+    uint32_t output = 0;
+    for (int i = 0; i < size; i++) {
+        output |= ((input >> i) & 0x1) << (size - 1 - i);
+    }
+    return output;
+}
+
+// Function to generate simplified subkeys
+void generate_subkeys(uint64_t key, KeySchedule *schedule) {
+    uint32_t left = (uint32_t)(key >> 32);
+    uint32_t right = (uint32_t)(key & 0xFFFFFFFF);
+
+    // Generate 16 subkeys in reverse order for decryption
+    for (int i = 0; i < 16; i++) {
+        // Simple key mixing
+        uint32_t mixed = left ^ right;
+        mixed = permute(mixed, 32);
+
+        // Store subkey in reverse order
+        schedule->subkeys[15 - i] = mixed;
+
+        // Rotate key parts
+        uint32_t temp = left;
+        left = right;
+        right = temp ^ (left << 1);
+    }
+}
+
+// Simplified f-function
+uint32_t f_function(uint32_t right, uint32_t subkey) {
+    // Expand right half (simplified)
+    uint32_t expanded = right ^ subkey;
+
+    // Apply S-box substitution
+    uint32_t result = 0;
+    for (int i = 0; i < 8; i++) {
+        uint8_t val = (expanded >> (i * 4)) & 0xF;
+        result |= (uint32_t)(SBOX[val] & 0xF) << (i * 4);
+    }
+
+    return permute(result, 32);
+}
+
+// Function to decrypt a block
+uint64_t decrypt_block(uint64_t block, KeySchedule *schedule) {
+    uint32_t left = (uint32_t)(block >> 32);
+    uint32_t right = (uint32_t)(block & 0xFFFFFFFF);
+
+    // Initial permutation
+    left = permute(left, 32);
+    right = permute(right, 32);
+
+    // 16 rounds of decryption
+    for (int i = 0; i < 16; i++) {
+        uint32_t temp = right;
+        right = left ^ f_function(right, schedule->subkeys[i]);
+        left = temp;
+    }
+
+    // Final swap and permutation
+    uint64_t result = ((uint64_t)right << 32) | left;
+    return result;
+}
+void print_hex(const char *label, uint64_t value) {
+    printf("%s: 0x%016llX\n", label, value);
+}
+void decrypt_and_show(uint64_t key, uint64_t ciphertext) {
+    printf("\nDES Decryption Demonstration:\n");
+    printf("-----------------------------\n");
+    print_hex("Key", key);
+    print_hex("Ciphertext", ciphertext);
+    KeySchedule schedule;
+    generate_subkeys(key, &schedule);
+    printf("\nSubkeys (showing first and last):\n");
+    print_hex("First Subkey", schedule.subkeys[0]);
+    print_hex("Last Subkey", schedule.subkeys[15]);
+    uint64_t plaintext = decrypt_block(ciphertext, &schedule);
+    printf("\nResult:\n");
+    print_hex("Decrypted Plaintext", plaintext);
+}
+int main() {
+    uint64_t test_key = 0x133457799BBCDFF1;
+    uint64_t test_ciphertext = 0x0123456789ABCDEF;
+    decrypt_and_show(test_key, test_ciphertext);
+    printf("\nAdditional Test:\n");
+    decrypt_and_show(0xAABBCCDDEEFF0011, 0x9876543210FEDCBA);
+    return 0;
+}
