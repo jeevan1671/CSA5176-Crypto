@@ -1,0 +1,83 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#define ALPHABET_SIZE 26
+char normalize_char(char c) {
+    if (c == ' ') return ' ';
+    return toupper(c);
+}
+void convert_numeric_key(const char *numeric_key, char *letter_key) {
+    int i;
+    for (i = 0; numeric_key[i] != '\0'; i++) {
+        if (isdigit(numeric_key[i])) {
+            letter_key[i] = (numeric_key[i] - '0') % ALPHABET_SIZE + 'A';
+        } else {
+            letter_key[i] = normalize_char(numeric_key[i]);
+        }
+    }
+    letter_key[i] = '\0';
+}
+void vigenere_encrypt(const char *plaintext, const char *key, char *ciphertext) {
+    int i, j = 0;
+    int key_len = strlen(key);
+    for (i = 0; plaintext[i] != '\0'; i++) {
+        if (plaintext[i] == ' ') {
+            ciphertext[i] = ' ';
+            continue;
+        }       
+        char p = normalize_char(plaintext[i]);
+        char k = key[j % key_len];
+
+        ciphertext[i] = ((p - 'A' + k - 'A') % ALPHABET_SIZE + 'A');
+        j++;
+    }
+    ciphertext[i] = '\0';
+}
+void vigenere_decrypt(const char *ciphertext, const char *key, char *plaintext) {
+    int i, j = 0;
+    int key_len = strlen(key);
+    for (i = 0; ciphertext[i] != '\0'; i++) {
+        if (ciphertext[i] == ' ') {
+            plaintext[i] = ' ';
+            continue;
+        }       
+        char c = normalize_char(ciphertext[i]);
+        char k = key[j % key_len];
+
+        plaintext[i] = ((c - k + ALPHABET_SIZE) % ALPHABET_SIZE + 'A');
+        j++;
+    }
+    plaintext[i] = '\0';
+}
+void find_key(const char *text1, const char *text2, char *key) {
+    int i, j = 0;
+    for (i = 0; text1[i] != '\0' && text2[i] != '\0'; i++) {
+        if (text1[i] == ' ' || text2[i] == ' ') {
+            continue;
+        }       
+        char c1 = normalize_char(text1[i]);
+        char c2 = normalize_char(text2[i]);
+
+        key[j] = ((c2 - c1 + ALPHABET_SIZE) % ALPHABET_SIZE + 'A');
+        j++;
+    }
+    key[j] = '\0';
+}
+int main() {
+    char plaintext[] = "SEND MORE MONEY";
+    char ciphertext[100];
+    char numeric_key[] = "9017231521141111289";
+    char letter_key[100];
+    char expected_plaintext[] = "CASH NOT NEEDED";
+    char derived_key[100];
+    convert_numeric_key(numeric_key, letter_key);
+    printf("Converted key: %s\n", letter_key);
+    vigenere_encrypt(plaintext, letter_key, ciphertext);
+    printf("Encrypted ciphertext: %s\n", ciphertext);
+    find_key(ciphertext, expected_plaintext, derived_key);
+    printf("Derived key: %s\n", derived_key);
+    char decrypted[100];
+    vigenere_decrypt(ciphertext, derived_key, decrypted);
+    printf("Decrypted text: %s\n", decrypted);   
+    return 0;
+}
