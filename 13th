@@ -1,0 +1,76 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define ALPHABET_SIZE 26
+#define MAX_SIZE 2  // For 2x2 matrix, which is most common for Hill cipher
+
+// Function to calculate determinant for 2x2 matrix
+int determinant(int key[MAX_SIZE][MAX_SIZE]) {
+    return (key[0][0] * key[1][1] - key[0][1] * key[1][0]) % ALPHABET_SIZE;
+}
+int mod_inverse(int a) {
+    for (int i = 1; i < ALPHABET_SIZE; i++) {
+        if (((a % ALPHABET_SIZE) * (i % ALPHABET_SIZE)) % ALPHABET_SIZE == 1) {
+            return i;
+        }
+    }
+    return -1;
+}
+void encrypt_pair(int key[MAX_SIZE][MAX_SIZE], char p1, char p2, char *c1, char *c2) {
+    int x = p1 - 'A';
+    int y = p2 - 'A';
+
+    *c1 = ((key[0][0] * x + key[0][1] * y) % ALPHABET_SIZE + ALPHABET_SIZE) % ALPHABET_SIZE + 'A';
+    *c2 = ((key[1][0] * x + key[1][1] * y) % ALPHABET_SIZE + ALPHABET_SIZE) % ALPHABET_SIZE + 'A';
+}
+void decrypt_pair(int key[MAX_SIZE][MAX_SIZE], char c1, char c2, char *p1, char *p2) {
+    int det = determinant(key);
+    int det_inv = mod_inverse(det);
+
+    if (det_inv == -1) {
+        printf("Error: Key matrix is not invertible\n");
+        return;
+    }
+    int adj[MAX_SIZE][MAX_SIZE] = {
+        { key[1][1], -key[0][1]},
+        {-key[1][0],  key[0][0]}
+    };
+    for (int i = 0; i < MAX_SIZE; i++) {
+        for (int j = 0; j < MAX_SIZE; j++) {
+            adj[i][j] = ((adj[i][j] % ALPHABET_SIZE) + ALPHABET_SIZE) % ALPHABET_SIZE;
+        }
+    }
+    int x = c1 - 'A';
+    int y = c2 - 'A';   
+    *p1 = ((det_inv * (adj[0][0] * x + adj[0][1] * y)) % ALPHABET_SIZE + 'A');
+    *p2 = ((det_inv * (adj[1][0] * x + adj[1][1] * y)) % ALPHABET_SIZE + 'A');
+}
+int main() {
+    int key[MAX_SIZE][MAX_SIZE] = {
+        {6, 24},
+        {13, 16}
+    };
+    char plaintext[100], ciphertext[100];
+    printf("Enter plaintext (uppercase letters only, even length): ");
+    scanf("%s", plaintext);
+    int len = strlen(plaintext);
+    if (len % 2 != 0) {
+        printf("Error: Plaintext length must be even\n");
+        return 1;
+    }
+    printf("Encrypting...\n");
+    for (int i = 0; i < len; i += 2) {
+        encrypt_pair(key, plaintext[i], plaintext[i+1], &ciphertext[i], &ciphertext[i+1]);
+    }
+    ciphertext[len] = '\0';
+    printf("Ciphertext: %s\n", ciphertext);
+    printf("Decrypting...\n");
+    char decrypted[100];
+    for (int i = 0; i < len; i += 2) {
+        decrypt_pair(key, ciphertext[i], ciphertext[i+1], &decrypted[i], &decrypted[i+1]);
+    }
+    decrypted[len] = '\0';
+    printf("Decrypted: %s\n", decrypted);   
+    return 0;
+}
