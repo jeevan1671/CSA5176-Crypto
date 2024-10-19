@@ -1,0 +1,116 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define BLOCK_SIZE 16
+
+void encrypt_block(unsigned char *output, unsigned char *input) {
+    // Simple encryption: XOR with a fixed key
+    unsigned char key[BLOCK_SIZE] = {
+        0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6,
+        0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C
+    };
+
+    for(int i = 0; i < BLOCK_SIZE; i++) {
+        output[i] = input[i] ^ key[i];
+    }
+}
+
+void decrypt_block(unsigned char *output, unsigned char *input) {
+    // Simple decryption: XOR with the same key
+    unsigned char key[BLOCK_SIZE] = {
+        0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6,
+        0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C
+    };
+
+    for(int i = 0; i < BLOCK_SIZE; i++) {
+        output[i] = input[i] ^ key[i];
+    }
+}
+
+void ecb_encrypt(unsigned char *output, unsigned char *input, int length) {
+    for(int i = 0; i < length; i += BLOCK_SIZE) {
+        encrypt_block(output + i, input + i);
+    }
+}
+
+void ecb_decrypt(unsigned char *output, unsigned char *input, int length) {
+    for(int i = 0; i < length; i += BLOCK_SIZE) {
+        decrypt_block(output + i, input + i);
+    }
+}
+
+// Pad input to match block size
+int add_padding(unsigned char *input, int length) {
+    int padding_length = BLOCK_SIZE - (length % BLOCK_SIZE);
+    int new_length = length + padding_length;
+
+    for(int i = length; i < new_length; i++) {
+        input[i] = padding_length;
+    }
+
+    return new_length;
+}
+
+void print_bytes(unsigned char *data, int length) {
+    for(int i = 0; i < length; i++) {
+        printf("%02X ", data[i]);
+    }
+    printf("\n");
+}
+
+int main() {
+    // Original message
+    unsigned char message[] = "Hello, ECB mode!";
+    int msg_length = strlen((char *)message);
+
+    // Prepare buffers
+    unsigned char padded_input[256] = {0};
+    unsigned char encrypted[256] = {0};
+    unsigned char decrypted[256] = {0};
+
+    // Copy original message and add padding
+    memcpy(padded_input, message, msg_length);
+    int padded_length = add_padding(padded_input, msg_length);
+
+    // Perform encryption
+    printf("Original message: %s\n", message);
+    printf("Original bytes: ");
+    print_bytes(padded_input, padded_length);
+
+    ecb_encrypt(encrypted, padded_input, padded_length);
+    printf("\nEncrypted bytes: ");
+    print_bytes(encrypted, padded_length);
+
+    // Introduce error in first block
+    printf("\nIntroducing error in ciphertext...\n");
+    encrypted[5] ^= 0xFF;
+
+    // Decrypt (including error)
+    ecb_decrypt(decrypted, encrypted, padded_length);
+    printf("\nDecrypted bytes: ");
+    print_bytes(decrypted, padded_length);
+
+    // Show the effect of the error
+    printf("\nDecrypted message (with error): ");
+    for(int i = 0; i < msg_length; i++) {
+        printf("%c", decrypted[i]);
+    }
+    printf("\n");
+
+    // Show which blocks are affected
+    printf("\nError propagation analysis:\n");
+    for(int i = 0; i < padded_length; i += BLOCK_SIZE) {
+        int block_num = i / BLOCK_SIZE;
+        int affected = 0;
+        for(int j = 0; j < BLOCK_SIZE; j++) {
+            if(padded_input[i + j] != decrypted[i + j]) {
+                affected = 1;
+                break;
+            }
+        }
+        printf("Block %d: %s\n", block_num, affected ? "AFFECTED" : "NOT AFFECTED");
+    }
+
+    return 0;
+}
