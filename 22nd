@@ -1,0 +1,188 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#define BLOCK_SIZE 8
+int P10[] = {3, 5, 2, 7, 4, 10, 1, 9, 8, 6};
+int P8[] = {6, 3, 7, 4, 8, 5, 10, 9};
+int IP[] = {2, 6, 3, 1, 4, 8, 5, 7};
+int EP[] = {4, 1, 2, 3, 2, 3, 4, 1};
+int P4[] = {2, 4, 3, 1};
+int IP_inverse[] = {4, 1, 3, 5, 7, 2, 8, 6};
+int S0[4][4] = {
+    {1, 0, 3, 2},
+    {3, 2, 1, 0},
+    {0, 2, 1, 3},
+    {3, 1, 0, 2}
+};
+int S1[4][4] = {
+    {0, 1, 2, 3},
+    {2, 3, 1, 0},
+    {3, 0, 1, 2},
+    {2, 1, 0, 3}
+};
+void left_shift(char *bits, int size) {
+    char temp = bits[0];
+    for(int i = 0; i < size-1; i++)
+        bits[i] = bits[i+1];
+    bits[size-1] = temp;
+}
+int binary_to_int(char *binary, int len) {
+    int result = 0;
+    for(int i = 0; i < len; i++) {
+        result = result * 2 + (binary[i] - '0');
+    }
+    return result;
+}
+
+// Function to convert integer to binary string
+void int_to_binary(int num, char *binary, int len) {
+    for(int i = len-1; i >= 0; i--) {
+        binary[i] = (num & 1) + '0';
+        num >>= 1;
+    }
+}
+
+// Generate S-DES subkeys
+void generate_keys(char *key, char *k1, char *k2) {
+    char p10_result[10];
+    char temp[10];
+
+    // Apply P10
+    for(int i = 0; i < 10; i++)
+        p10_result[i] = key[P10[i]-1];
+
+    // Split and shift for K1
+    memcpy(temp, p10_result, 5);
+    left_shift(temp, 5);
+    memcpy(p10_result, temp, 5);
+    memcpy(temp+5, p10_result+5, 5);
+    left_shift(temp+5, 5);
+
+    // Apply P8 to get K1
+    for(int i = 0; i < 8; i++)
+        k1[i] = temp[P8[i]-1];
+
+    // Additional shifts for K2
+    left_shift(temp, 5);
+    left_shift(temp+5, 5);
+
+    // Apply P8 to get K2
+    for(int i = 0; i < 8; i++)
+        k2[i] = temp[P8[i]-1];
+}
+
+// F-function for S-DES
+void f_function(char *right, char *subkey, char *result) {
+    char expanded[8];
+    char xored[8];
+    char s_output[4];
+
+    // Expansion
+    for(int i = 0; i < 8; i++)
+        expanded[i] = right[EP[i]-1];
+
+    // XOR with subkey
+    for(int i = 0; i < 8; i++)
+        xored[i] = (expanded[i] - '0') ^ (subkey[i] - '0') + '0';
+
+    // S-Box substitution
+    int row = binary_to_int(&xored[0], 2);
+    int col = binary_to_int(&xored[2], 2);
+    int_to_binary(S0[row][col], &s_output[0], 2);
+
+    row = binary_to_int(&xored[4], 2);
+    col = binary_to_int(&xored[6], 2);
+    int_to_binary(S1[row][col], &s_output[2], 2);
+
+    // P4 permutation
+    for(int i = 0; i < 4; i++)
+        result[i] = s_output[P4[i]-1];
+}
+
+// S-DES encryption function
+void sdes_encrypt(char *plaintext, char *key, char *ciphertext) {
+    char k1[8], k2[8];
+    char temp[8], f_result[4];
+
+    // Generate subkeys
+    generate_keys(key, k1, k2);
+
+    // Initial Permutation
+    for(int i = 0; i < 8; i++)
+        temp[i] = plaintext[IP[i]-1];
+
+    // First round
+    f_function(temp+4, k1, f_result);
+    for(int i = 0; i < 4; i++)
+        temp[i] = (temp[i] - '0') ^ (f_result[i] - '0') + '0';
+
+    // Swap halves
+    for(int i = 0; i < 4; i++) {
+        char t = temp[i];
+        temp[i] = temp[i+4];
+        temp[i+4] = t;
+    }
+
+    // Second round
+    f_function(temp+4, k2, f_result);
+    for(int i = 0; i < 4; i++)
+        temp[i] = (temp[i] - '0') ^ (f_result[i] - '0') + '0';
+
+    // Final Permutation
+    for(int i = 0; i < 8; i++)
+        ciphertext[i] = temp[IP_inverse[i]-1];
+}
+
+// S-DES decryption function
+void sdes_decrypt(char *ciphertext, char *key, char *plaintext) {
+    char k1[8], k2[8];
+    char temp[8], f_result[4];
+
+    // Generate subkeys
+    generate_keys(key, k1, k2);
+
+    // Initial Permutation
+    for(int i = 0; i < 8; i++)
+        temp[i] = ciphertext[IP[i]-1];
+
+    // First round (using K2)
+    f_function(temp+4, k2, f_result);
+    for(int i = 0; i < 4; i++)
+        temp[i] = (temp[i] - '0') ^ (f_result[i] - '0') + '0';
+
+    // Swap halves
+    for(int i = 0; i < 4; i++) {
+        char t = temp[i];
+        temp[i] = temp[i+4];
+        temp[i+4] = t;
+    }
+
+    // Second round (using K1)
+    f_function(temp+4, k1, f_result);
+    for(int i = 0; i < 4; i++)
+        temp[i] = (temp[i] - '0') ^ (f_result[i] - '0') + '0';
+
+    // Final Permutation
+    for(int i = 0; i < 8; i++)
+        plaintext[i] = temp[IP_inverse[i]-1];
+}
+
+int main() {
+    // Test case
+    char key[] = "0111111101";
+    char plaintext[] = "00000001001000110";
+    char ciphertext[9] = {0};
+    char decrypted[9] = {0};
+
+    printf("Original plaintext: %s\n", plaintext);
+
+    // Encrypt
+    sdes_encrypt(plaintext, key, ciphertext);
+    printf("Encrypted: %s\n", ciphertext);
+
+    // Decrypt
+    sdes_decrypt(ciphertext, key, decrypted);
+    printf("Decrypted: %s\n", decrypted);
+
+    return 0;
+}
