@@ -1,0 +1,140 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define BLOCK_SIZE 16
+#define MAX_BLOCKS 100
+typedef enum {
+    ECB,
+    CBC,
+    CFB
+} CipherMode;
+// Function to perform XOR of two blocks
+void xor_blocks(unsigned char *dest, const unsigned char *src) {
+    for(int i = 0; i < BLOCK_SIZE; i++) {
+        dest[i] ^= src[i];
+    }
+}
+
+// Simple block encryption (for demonstration)
+void encrypt_block(unsigned char *output, const unsigned char *input) {
+    static const unsigned char key[BLOCK_SIZE] = {
+        0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6,
+        0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C
+    };
+
+    for(int i = 0; i < BLOCK_SIZE; i++) {
+        output[i] = input[i] ^ key[i];
+    }
+}
+
+// Apply PKCS7 padding
+int pad_message(unsigned char *message, int length) {
+    int padding_length = BLOCK_SIZE - (length % BLOCK_SIZE);
+    int final_length = length + padding_length;
+
+    // If the message is already a multiple of block size,
+    // add a full block of padding
+    if (padding_length == 0) {
+        padding_length = BLOCK_SIZE;
+        final_length = length + BLOCK_SIZE;
+    }
+
+    // Add padding bytes
+    for(int i = length; i < final_length; i++) {
+        message[i] = padding_length;
+    }
+
+    return final_length;
+}
+
+// ECB Mode Encryption
+void ecb_encrypt(unsigned char *output, unsigned char *input, int length) {
+    for(int i = 0; i < length; i += BLOCK_SIZE) {
+        encrypt_block(output + i, input + i);
+    }
+}
+
+// CBC Mode Encryption
+void cbc_encrypt(unsigned char *output, unsigned char *input, int length, unsigned char *iv) {
+    unsigned char block[BLOCK_SIZE];
+    memcpy(block, iv, BLOCK_SIZE);
+
+    for(int i = 0; i < length; i += BLOCK_SIZE) {
+        // XOR with previous ciphertext block or IV
+        for(int j = 0; j < BLOCK_SIZE; j++) {
+            block[j] ^= input[i + j];
+        }
+
+        // Encrypt the block
+        encrypt_block(output + i, block);
+
+        // Save ciphertext for next block
+        memcpy(block, output + i, BLOCK_SIZE);
+    }
+}
+
+// CFB Mode Encryption
+void cfb_encrypt(unsigned char *output, unsigned char *input, int length, unsigned char *iv) {
+    unsigned char block[BLOCK_SIZE];
+    memcpy(block, iv, BLOCK_SIZE);
+
+    for(int i = 0; i < length; i += BLOCK_SIZE) {
+        // Encrypt previous ciphertext or IV
+        encrypt_block(block, block);
+
+        // XOR with plaintext to get ciphertext
+        for(int j = 0; j < BLOCK_SIZE; j++) {
+            output[i + j] = input[i + j] ^ block[j];
+        }
+
+        // Save ciphertext for next block
+        memcpy(block, output + i, BLOCK_SIZE);
+    }
+}
+
+void print_bytes(const char *label, unsigned char *data, int length) {
+    printf("%s: ", label);
+    for(int i = 0; i < length; i++) {
+        printf("%02X ", data[i]);
+    }
+    printf("\n");
+}
+
+int main() {
+    // Test message
+    unsigned char message[] = "This is a test message for multiple encryption modes!";
+    int msg_length = strlen((char *)message);
+
+    // Buffers for padded message and encrypted output
+    unsigned char padded_msg[MAX_BLOCKS * BLOCK_SIZE];
+    unsigned char encrypted[MAX_BLOCKS * BLOCK_SIZE];
+
+    // Copy message and add padding
+    memcpy(padded_msg, message, msg_length);
+    int padded_length = pad_message(padded_msg, msg_length);
+
+    // Initial Vector for CBC and CFB modes
+    unsigned char iv[BLOCK_SIZE] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F
+    };
+
+    printf("Original message: %s\n", message);
+    printf("Message length: %d bytes\n", msg_length);
+    printf("Padded length: %d bytes\n\n", padded_length);
+
+    // Test all three modes
+    printf("ECB Mode:\n");
+    ecb_encrypt(encrypted, padded_msg, padded_length);
+    print_bytes("Encrypted", encrypted, padded_length);
+
+    printf("\nCBC Mode:\n");
+    cbc_encrypt(encrypted, padded_msg, padded_length, iv);
+    print_bytes("Encrypted", encrypted, padded_length);
+
+    printf("\nCFB Mode:\n");
+    cfb_encrypt(encrypted, padded_msg, padded_length, iv);
+    print_bytes("Encrypted", encrypted, padded_length);
+
+    return 0;
+}
