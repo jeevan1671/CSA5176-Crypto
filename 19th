@@ -1,0 +1,61 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define BLOCK_SIZE 8
+typedef struct {
+    unsigned char k1[8];
+    unsigned char k2[8];
+    unsigned char k3[8];
+} TDES_KEY;
+void xor_blocks(unsigned char *dest, const unsigned char *src, size_t len) {
+    for(size_t i = 0; i < len; i++) {
+        dest[i] ^= src[i];
+    }
+}
+void tdes_encrypt_block(unsigned char *output, const unsigned char *input, const TDES_KEY *key) {
+    memcpy(output, input, BLOCK_SIZE);
+    for(int i = 0; i < BLOCK_SIZE; i++) {
+        output[i] = output[i] ^ key->k1[i];
+        output[i] = output[i] ^ key->k2[i];
+        output[i] = output[i] ^ key->k3[i];
+    }
+}
+void cbc_encrypt(unsigned char *output, 
+                const unsigned char *input,
+                size_t length,
+                const TDES_KEY *key,
+                unsigned char *iv) {
+
+    unsigned char temp[BLOCK_SIZE];
+    unsigned char prev_cipher[BLOCK_SIZE];
+    memcpy(prev_cipher, iv, BLOCK_SIZE);
+    for(size_t i = 0; i < length; i += BLOCK_SIZE) {
+        memcpy(temp, &input[i], BLOCK_SIZE);
+        xor_blocks(temp, prev_cipher, BLOCK_SIZE);
+        tdes_encrypt_block(&output[i], temp, key);
+        memcpy(prev_cipher, &output[i], BLOCK_SIZE);
+    }
+}
+int main() {
+    TDES_KEY key = {
+        {0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF},  // Key 1
+        {0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10},  // Key 2
+        {0x89, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67}   // Key 3
+    };
+    unsigned char iv[BLOCK_SIZE] = {
+        0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF
+    };
+    unsigned char plaintext[] = "This is a test message!";
+    size_t pt_len = ((strlen((char*)plaintext) + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE;
+    unsigned char *ciphertext = (unsigned char*)malloc(pt_len);
+    cbc_encrypt(ciphertext, plaintext, pt_len, &key, iv);
+    printf("Plaintext: %s\n", plaintext);
+    printf("Ciphertext (hex): ");
+    for(size_t i = 0; i < pt_len; i++) {
+        printf("%02X ", ciphertext[i]);
+    }
+    printf("\n");
+
+    free(ciphertext);
+    return 0;
+}
